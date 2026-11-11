@@ -33,7 +33,7 @@ class Network:
             if test_data:
                 print(f"Epoch {j}: {self.evaluate(test_data)} / {n_test}")
             else:
-                print(f"Epoch {0} complete".format(j))
+                print(f"Epoch {j} complete")
 
 
     def update_mini_batch(self, mini_batch, eta):
@@ -46,20 +46,67 @@ class Network:
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
 
         self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]    
-        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.weights, nabla_b)]    
+        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]    
 
 
     def backprop(self, x, y):
-        pass
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
+        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        
+        activation = x
+        activations = [x]
+        z_arr = []
 
+        # the first thing i need to do is 'feedforward'
+        for b, w in zip(self.biases, self.weights):
+            # this is simple. it does matrix multiplication
+            # with the weight matrix w and activation vectors a
+            # and finally does matrix addition with the bias vector
+            # so lets say we have 2 neurons so z would give us [val1, val2]  
+            z = np.dot(w, activation) + b
+            z_arr.append(z)
+
+            # this basically does "vectorization"
+            # which means it applies the sigmoid function elementwise
+            # i.e to each element in the z vector
+            activation = sigmoid(z)
+            activations.append(activation)
+
+        # the next thing i need to do is 'backprop'
+        delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(z_arr[-1])
+        nabla_b[-1] = delta
+        nabla_w[-1] = np.dot(delta, activations[-2].transpose()) 
+
+        # now i can start backpropagating to the hidden layers
+        # here l is the "distance" from the output layer and not the
+        # actual layer number. so if l = 2 it means its the second last layer 
+        for l in range(2, self.num_layers):
+            z = z_arr[-l]
+            sp = sigmoid_prime(z)
+            delta = np.dot(self.weights[-l + 1].transpose(), delta) * sp
+            nabla_b[-l] = delta
+            nabla_w[-l] = np.dot(delta, activations[-l - 1].transpose()) 
+
+        return (nabla_b, nabla_w)
+
+        
+
+    def cost_derivative(self, output_activation, y):
+        # this is basically what we get if we diffrentiate
+        # the cost function 1/2 * (y  - a)^2
+        # its essentially: delC_x/dela
+        return (output_activation - y)
+    
     def evaluate(self, test_data):
-        pass
+        test_results = [(np.argmax(self.feedforward(x)), y)
+                        for (x, y) in test_data]
+        return sum(int(x == y) for (x, y) in test_results)
 
 
 def sigmoid(z):
     return 1.0/(1.0 + np.exp(-z))
 
 
-net = Network([2, 3, 1])
-print(net.weights)
-print(net.biases)
+def sigmoid_prime(z):
+    return sigmoid(z) * (1 - sigmoid(z))
+
